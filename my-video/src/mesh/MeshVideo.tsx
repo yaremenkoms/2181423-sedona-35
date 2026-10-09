@@ -4,12 +4,16 @@ import { AbsoluteFill, Img, Sequence, interpolate, spring, useCurrentFrame, useV
 import { MeshVideoConfig } from "./types";
 import { Background } from "./Background";
 import { Laptop, Phone, laptopSize, phoneSize } from "./Devices";
-import { SideContent } from "./Side";
+import { StepPanel, Tracker, stepEnd } from "./Panel";
 import { asset, sceneEnd } from "./ScreenStack";
 import { EASE_IN_OUT, FONT, H, W, clamp } from "./theme";
 
-// Плавный переход значения на границах сцен: v(i) — целевое значение сцены i
-const sceneValue = (cfg: MeshVideoConfig, t: number, v: (i: number) => number, dur = 0.5) => {
+// Где стоит устройство: слева, панель шагов — справа
+const DEVICE_CX = { phone: 640, laptop: 600 };
+const LAPTOP_SCALE = 0.66;
+
+// Плавный переход значения на границах сцен (никаких колебаний между ними)
+const sceneValue = (cfg: MeshVideoConfig, t: number, v: (i: number) => number, dur = 0.6) => {
   let i = cfg.scenes.findIndex((s, k) => t >= s.start && t < sceneEnd(cfg, k));
   if (i < 0) i = t < cfg.scenes[0].start ? 0 : cfg.scenes.length - 1;
   const prev = i > 0 ? v(i - 1) : v(0);
@@ -21,56 +25,51 @@ const DeviceLayer: React.FC<{ cfg: MeshVideoConfig }> = ({ cfg }) => {
   const { fps } = useVideoConfig();
   const t = frame / fps;
   const isPhone = cfg.device === "phone";
-  const size = isPhone ? phoneSize(cfg) : laptopSize(cfg);
-  const dh = isPhone ? size.h : size.h + 34;
 
-  // Появление после обложки и уход перед финалом
-  const enter = spring({ frame, fps, delay: Math.round(cfg.coverEnd * fps), config: { damping: 17, stiffness: 110 } });
-  const leave = interpolate(t, [cfg.finalStart - 0.1, cfg.finalStart + 0.4], [0, 1], { ...clamp, easing: EASE_IN_OUT });
-  if (t < cfg.coverEnd - 0.05 || leave >= 1) return null;
+  const enter = spring({ frame, fps, delay: Math.round((cfg.coverEnd - 0.1) * fps), config: { damping: 200, stiffness: 90 } });
+  const leave = interpolate(t, [cfg.finalStart - 0.1, cfg.finalStart + 0.45], [0, 1], { ...clamp, easing: EASE_IN_OUT });
+  if (t < cfg.coverEnd - 0.15 || leave >= 1) return null;
 
-  const hasSide = (i: number) => (cfg.scenes[i].side ? 1 : 0);
-  const sideP = sceneValue(cfg, t, hasSide);
-  const tiltP = sceneValue(cfg, t, (i) => (cfg.scenes[i].tilt ? 1 : 0), 0.7);
-
-  const baseScale = isPhone ? 1 : 0.9;
-  const sideScale = isPhone ? 1 : 0.62;
-  const cx = interpolate(sideP, [0, 1], [W / 2, isPhone ? 700 : 640]);
-  const scale = interpolate(sideP, [0, 1], [baseScale, sideScale]) * interpolate(enter, [0, 1], [0.3, 1]) * (1 - leave * 0.2);
-
-  // Приближение камеры (ноутбук)
-  const zoomScale = sceneValue(cfg, t, (i) => cfg.scenes[i].zoom?.scale ?? 1, 0.7);
-  const zoomRect = (i: number) => cfg.scenes[i].zoom?.rect;
-  const zx = sceneValue(cfg, t, (i) => {
-    const r = zoomRect(i);
-    return r ? size.w / 2 - (size.bezel + (r.x + r.w / 2) * size.scale) : 0;
-  }, 0.7);
-  const zy = sceneValue(cfg, t, (i) => {
-    const r = zoomRect(i);
-    return r ? dh / 2 - (size.bezel + (isPhone ? 0 : 46) + (r.y + r.h / 2) * size.scale) : 0;
-  }, 0.7);
-
-  const float = Math.sin(frame / 40) * 6;
-
-  return (
-    <AbsoluteFill style={{ perspective: 2400 }}>
+  if (isPhone) {
+    const s = phoneSize(cfg);
+    // Камера: экран телефона выше кадра — проезжаем к области подсветки
+    const topFor = (i: number) => {
+      const sc = cfg.scenes[i];
+      const fy = sc.focusY ?? (sc.marks?.[0] ? sc.marks[0].rect.y + sc.marks[0].rect.h / 2 : cfg.screenSize.h * 0.3);
+      const want = H / 2 - (s.bezel + fy * s.scale);
+      return Math.max(H - s.h - 60, Math.min(60, want));
+    };
+    const top = sceneValue(cfg, t, topFor);
+    return (
       <div
         style={{
           position: "absolute",
-          left: cx - size.w / 2,
-          top: H / 2 - dh / 2 + float,
-          width: size.w,
-          height: dh,
-          scale: scale * zoomScale,
-          translate: `${zx * (zoomScale - 1)}px ${zy * (zoomScale - 1)}px`,
-          opacity: interpolate(enter, [0, 0.3], [0, 1], clamp) * (1 - leave),
-          rotate: `x ${tiltP * 8}deg`,
-          transformStyle: "preserve-3d",
+          left: DEVICE_CX.phone - s.w / 2,
+          top: top + (1 - enter) * 700 + leave * 900,
+          opacity: interpolate(enter, [0, 0.25], [0, 1], clamp) * (1 - leave),
         }}
       >
-        <div style={{ rotate: `y ${tiltP * -18}deg`, width: size.w, height: dh }}>{isPhone ? <Phone cfg={cfg} /> : <Laptop cfg={cfg} />}</div>
+        <Phone cfg={cfg} />
       </div>
-    </AbsoluteFill>
+    );
+  }
+
+  const s = laptopSize(cfg);
+  const dh = s.h + 34;
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: DEVICE_CX.laptop - s.w / 2,
+        top: H / 2 - dh / 2 + (1 - enter) * 600 + leave * 800,
+        width: s.w,
+        height: dh,
+        scale: LAPTOP_SCALE,
+        opacity: interpolate(enter, [0, 0.25], [0, 1], clamp) * (1 - leave),
+      }}
+    >
+      <Laptop cfg={cfg} />
+    </div>
   );
 };
 
@@ -91,7 +90,7 @@ const Cover: React.FC<{ cfg: MeshVideoConfig }> = ({ cfg }) => {
 const Final: React.FC<{ cfg: MeshVideoConfig }> = ({ cfg }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const p = spring({ frame, fps, delay: 6, config: { damping: 12, stiffness: 120 } });
+  const p = spring({ frame, fps, delay: 6, config: { damping: 14, stiffness: 120 } });
   return (
     <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
       <Img
@@ -113,23 +112,20 @@ export const MeshVideo: React.FC<{ cfg: MeshVideoConfig }> = ({ cfg }) => {
   const sec = (s: number) => Math.round(s * fps);
 
   return (
-    <AbsoluteFill style={{ fontFamily: FONT }}>
+    <AbsoluteFill style={{ fontFamily: FONT, fontVariantNumeric: "lining-nums", fontFeatureSettings: '"lnum" 1' }}>
       <Background color={cfg.service.color} />
 
       <DeviceLayer cfg={cfg} />
 
-      {cfg.scenes.map((s, i) =>
-        s.side ? (
-          <Sequence
-            key={i}
-            from={sec(s.side.at ?? s.start)}
-            durationInFrames={sec(sceneEnd(cfg, i)) - sec(s.side.at ?? s.start)}
-            premountFor={fps}
-          >
-            <SideContent cfg={cfg} side={s.side} len={sec(sceneEnd(cfg, i)) - sec(s.side.at ?? s.start)} />
+      <Tracker cfg={cfg} />
+      {cfg.steps.map((st, i) => {
+        const len = sec(stepEnd(cfg, i)) - sec(st.start);
+        return (
+          <Sequence key={i} from={sec(st.start)} durationInFrames={len} premountFor={fps}>
+            <StepPanel cfg={cfg} step={st} len={len} />
           </Sequence>
-        ) : null,
-      )}
+        );
+      })}
 
       <Sequence durationInFrames={sec(cfg.coverEnd + 0.4)} premountFor={fps}>
         <Cover cfg={cfg} />
@@ -143,4 +139,3 @@ export const MeshVideo: React.FC<{ cfg: MeshVideoConfig }> = ({ cfg }) => {
     </AbsoluteFill>
   );
 };
-

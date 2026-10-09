@@ -24,7 +24,7 @@ const Highlight: React.FC<{ mark: Mark; until: number; scale: number; color: str
   const p = spring({ frame: local, fps, config: { damping: 15, stiffness: 170 } });
   const out = interpolate(t, [until - 0.2, until], [1, 0], clamp);
   const r = mark.rect;
-  const pad = 6 / scale;
+  const pad = 8 / scale;
   const tap = mark.tap !== false && device === "phone";
   const tapLocal = local - Math.round(0.3 * fps);
   const tapP = interpolate(tapLocal, [0, 5, 18], [0, 1, 0], clamp);
@@ -38,9 +38,9 @@ const Highlight: React.FC<{ mark: Mark; until: number; scale: number; color: str
           top: (r.y - pad) * scale,
           width: (r.w + pad * 2) * scale,
           height: (r.h + pad * 2) * scale,
-          borderRadius: Math.min(16, ((r.h + pad * 2) * scale) / 2),
-          border: `${device === "phone" ? 3.5 : 3}px solid ${color}`,
-          boxShadow: `0 0 0 4px rgba(255,255,255,0.65), 0 6px 22px rgba(0,0,0,0.12)`,
+          borderRadius: Math.min(20, ((r.h + pad * 2) * scale) / 2),
+          border: `${device === "phone" ? 7 : 5}px solid ${color}`,
+          boxShadow: `0 0 0 3px rgba(255,255,255,0.8), 0 0 26px ${color}66`,
           opacity: p * out,
           scale: interpolate(p, [0, 1], [1.08, 1]),
           boxSizing: "border-box",
@@ -50,10 +50,10 @@ const Highlight: React.FC<{ mark: Mark; until: number; scale: number; color: str
         <div
           style={{
             position: "absolute",
-            left: (r.x + r.w / 2) * scale - 22,
-            top: (r.y + r.h / 2) * scale - 22,
-            width: 44,
-            height: 44,
+            left: (r.x + r.w / 2) * scale - 30,
+            top: (r.y + r.h / 2) * scale - 30,
+            width: 60,
+            height: 60,
             borderRadius: "50%",
             background: "rgba(120,120,130,0.55)",
             opacity: tapP,

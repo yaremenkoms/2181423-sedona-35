@@ -6,12 +6,13 @@ import { EASE_IN_OUT, clamp } from "./theme";
 
 /* ───────── Телефон ───────── */
 
-export const PHONE_SCREEN_H = 800;
+// Телефон крупный, как в эталоне: выше кадра, камера проезжает к нужной части экрана
+export const PHONE_SCREEN_H = 1120;
 
 export const phoneSize = (cfg: MeshVideoConfig) => {
   const scale = PHONE_SCREEN_H / cfg.screenSize.h;
   const sw = cfg.screenSize.w * scale;
-  const bezel = 14;
+  const bezel = 18;
   return { scale, sw, sh: PHONE_SCREEN_H, w: sw + bezel * 2, h: PHONE_SCREEN_H + bezel * 2, bezel };
 };
 
@@ -23,15 +24,15 @@ export const Phone: React.FC<{ cfg: MeshVideoConfig }> = ({ cfg }) => {
         position: "relative",
         width: s.w,
         height: s.h,
-        borderRadius: 68,
+        borderRadius: 84,
         background: "linear-gradient(150deg, #3A3D48 0%, #15161C 40%, #2A2C34 100%)",
         boxShadow: "0 60px 120px rgba(20,20,60,0.35), inset 0 0 0 2px rgba(255,255,255,0.18), inset 0 0 0 6px #0C0D12",
       }}
     >
-      <div style={{ position: "absolute", left: s.bezel, top: s.bezel, borderRadius: 54, overflow: "hidden" }}>
+      <div style={{ position: "absolute", left: s.bezel, top: s.bezel, borderRadius: 66, overflow: "hidden" }}>
         <ScreenStack cfg={cfg} scale={s.scale} />
       </div>
-      <div style={{ position: "absolute", left: s.w / 2 - 58, top: s.bezel + 12, width: 116, height: 32, borderRadius: 16, background: "#05060A" }} />
+      <div style={{ position: "absolute", left: s.w / 2 - 80, top: s.bezel + 16, width: 160, height: 44, borderRadius: 22, background: "#05060A" }} />
     </div>
   );
 };
