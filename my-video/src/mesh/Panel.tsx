@@ -34,11 +34,12 @@ export const Tracker: React.FC<{ cfg: MeshVideoConfig }> = ({ cfg }) => {
     progress = interpolate(t, [s.start, s.start + 0.45], [prevN - 1, target - 1], { ...clamp, easing: EASE_IN_OUT });
   });
 
+  const G = cfg.panel ?? PANEL;
   const size = 58;
-  const gap = (PANEL.width - size) / (N - 1);
+  const gap = (G.width - size) / (N - 1);
 
   return (
-    <div style={{ position: "absolute", left: PANEL.left, top: PANEL.trackerTop, width: PANEL.width, height: size, opacity: appear * leave }}>
+    <div style={{ position: "absolute", left: G.left, top: G.trackerTop, width: G.width, height: size, opacity: appear * leave }}>
       {Array.from({ length: N - 1 }).map((_, i) => {
         const fill = Math.max(0, Math.min(1, progress - i));
         return (
@@ -128,7 +129,7 @@ const BlockView: React.FC<{ block: Block; cfg: MeshVideoConfig; stepStart: numbe
       return (
         <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
           {block.before ? <div style={{ color: pal.sub, fontSize: 44, fontWeight: 700 }}>{block.before}</div> : null}
-          <div style={{ ...btn, display: "inline-flex", alignItems: "center", gap: 20, padding: "24px 40px", fontSize: 46, fontWeight: 500 }}>
+          <div style={{ ...btn, display: "inline-flex", alignItems: "center", gap: 20, padding: "24px 40px", fontSize: 46, fontWeight: 500, whiteSpace: "nowrap" }}>
             {block.icon ? (
               v === "soft" ? (
                 <div style={{ width: 66, height: 66, borderRadius: "50%", background: mix(ui, "#FFFFFF", 0.9), display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -332,12 +333,13 @@ export const StepPanel: React.FC<{ cfg: MeshVideoConfig; step: Step; len: number
   const lift = interpolate(frame, [len - 7, len], [0, -24], clamp);
 
   const longest = Math.max(...step.title.split("\n").map((l) => l.length));
-  const titleSize = Math.min(118, Math.floor(PANEL.width / (longest * 0.63)));
+  const G = cfg.panel ?? PANEL;
+  const titleSize = Math.min(118, Math.floor(G.width / (longest * 0.63)));
   const eyebrow = step.eyebrow ?? (step.done ? undefined : `Шаг ${step.n} из ${N}`);
   const rel = (at?: number) => (at === undefined ? undefined : Math.round((at - step.start) * fps));
 
   return (
-    <div style={{ position: "absolute", left: PANEL.left, top: PANEL.contentTop, width: PANEL.width, opacity: out, translate: `0 ${lift}px` }}>
+    <div style={{ position: "absolute", left: G.left, top: G.contentTop, width: G.width, opacity: out, translate: `0 ${lift}px` }}>
       {eyebrow ? (
         <Appear delay={0}>
           <div style={{ color: step.eyebrow ? mix("#E0457B", cfg.service.color, 0.35) : pal.eyebrow, fontSize: 34, fontWeight: 800, letterSpacing: 6, textTransform: "uppercase", marginBottom: 8 }}>

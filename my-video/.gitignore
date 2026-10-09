@@ -18,3 +18,5 @@ public/videos/**/*.jpg
 public/videos/**/*.webp
 public/motion/**/*.mp3
 public/motion/*/music.wav
+public/videos/**/*.mp4
+public/videos/**/*.wav

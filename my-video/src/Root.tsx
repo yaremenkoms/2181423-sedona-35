@@ -5,6 +5,7 @@ import { Title } from "./HelloWorld/Title";
 import { MeshVideo } from "./mesh/MeshVideo";
 import { scanWorks } from "./videos/scan-works";
 import { laptopTest } from "./videos/laptop-test";
+import { SEND_WORK_V2_DURATION, SendWorkV2 } from "./videos/send-work-v2";
 import { motionDuration } from "./motion/Stage";
 import { SendHomework, sendHomework } from "./motion/videos/send-homework";
 
@@ -24,6 +25,14 @@ export const RemotionRoot: React.FC = () => {
         />
       </Folder>
       <Folder name="MESH">
+        <Composition
+          id="send-work-v2"
+          component={SendWorkV2}
+          durationInFrames={Math.ceil(SEND_WORK_V2_DURATION * 30)}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
         <Composition
           id="scan-works"
           component={MeshVideo}

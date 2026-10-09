@@ -1,7 +1,8 @@
 """Звук для моушен-ролика без сети: музыка и эффекты синтезируются numpy.
 
     python3 -I synth.py sfx   <папка>                      # библиотека эффектов (один раз)
-    python3 -I synth.py music <выход.wav> <длина_с> <дроп_с> # музыка ре минор, 120 BPM, дроп в момент <дроп_с>
+    python3 -I synth.py music <выход.wav> <длина_с> <дроп_с> [soft] # ре минор, 120 BPM, дроп в <дроп_с>
+                                                             # soft — спокойная подложка без бочки (инструкции, обучение)
 
 Эффекты: whoosh (склейка), hit (удар на важном), pop (появление), tick (счётчик/список),
 riser (нарастание перед дропом), click (интерфейс), stop (тейп-стоп перед драматической фразой).
@@ -61,7 +62,7 @@ def sfx(out):
     stop = np.sign(np.sin(2 * np.pi * np.cumsum(f) / SR)) * 0.3 * (1 - tt / d)
     save(f"{out}/stop.wav", lowpass(stop, 1800))
 
-def music(out, length, drop):
+def music(out, length, drop, soft=False):
     bpm = 120; beat = 60 / bpm; n = int(length * SR)
     mix = np.zeros((n, 2))
     def add(x, at, gain=1.0, pan=0.0):
@@ -87,7 +88,17 @@ def music(out, length, drop):
             pad = sum(np.sin(2 * np.pi * nf(m) * tt + np.sin(2 * np.pi * 0.3 * tt)) for m in chord) / 3
             pad *= np.minimum(1, tt / 0.6) * np.minimum(1, (d - tt) / 0.4)
             add(lowpass(pad, 1400 if after else 700), at, 0.10 if after else 0.08)
-        if after:
+        if soft and after:
+            # спокойный вариант: арпеджио по аккорду восьмыми, длинный бас, редкий хэт
+            for k in range(2):
+                m = chord[(b * 2 + k) % 3] + 12
+                tt = t(beat * 0.5); pl = np.sin(2 * np.pi * nf(m) * tt) * env(len(tt), 0.004, 0.18)
+                add(lowpass(pl, 2500), at + k * beat * 0.5, 0.07, 0.25 if k else -0.25)
+            if b % 4 == 0:
+                tt = t(beat * 3.8); bass = np.sin(2 * np.pi * nf(root - 12) * tt) * np.minimum(1, tt / 0.05) * np.exp(-tt / 3)
+                add(lowpass(bass, 400), at, 0.22)
+            if b % 2 == 1: add(hat, at + 0.5 * beat, 0.03, -0.3)
+        elif after:
             add(kick, at, 0.55)
             if b % 2 == 1: add(clap, at, 0.18, 0.1)
             for h in (0, 0.5):
@@ -107,4 +118,4 @@ def music(out, length, drop):
 if sys.argv[1] == "sfx":
     sfx(sys.argv[2])
 else:
-    music(sys.argv[2], float(sys.argv[3]), float(sys.argv[4]))
+    music(sys.argv[2], float(sys.argv[3]), float(sys.argv[4]), len(sys.argv) > 5 and sys.argv[5] == "soft")

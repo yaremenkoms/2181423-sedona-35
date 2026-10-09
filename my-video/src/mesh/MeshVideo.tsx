@@ -119,6 +119,7 @@ export const MeshVideo: React.FC<{ cfg: MeshVideoConfig }> = ({ cfg }) => {
 
       <Tracker cfg={cfg} />
       {cfg.steps.map((st, i) => {
+        if (st.hidden) return null;
         const len = sec(stepEnd(cfg, i)) - sec(st.start);
         return (
           <Sequence key={i} from={sec(st.start)} durationInFrames={len} premountFor={fps}>

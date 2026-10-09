@@ -68,6 +68,8 @@ export type Step = {
   blocks?: Block[];
   // «Готово!» — все шаги в трекере отмечаются галочками
   done?: boolean;
+  // Не показывать панель (место занято графикой из исходного ролика); трекер остаётся
+  hidden?: boolean;
 };
 
 export type MeshVideoConfig = {
@@ -89,4 +91,6 @@ export type MeshVideoConfig = {
   finalStart: number; // с этого момента — финал с логотипом
   scenes: Scene[];
   steps: Step[];
+  // Положение панели шагов, если стандартное не подходит (например, поверх готового ролика)
+  panel?: { left: number; width: number; trackerTop: number; contentTop: number };
 };
