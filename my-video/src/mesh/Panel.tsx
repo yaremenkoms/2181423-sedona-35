@@ -21,6 +21,16 @@ export const Tracker: React.FC<{ cfg: MeshVideoConfig }> = ({ cfg }) => {
   if (t < first - 0.3 || t > cfg.finalStart + 0.4) return null;
 
   const appear = interpolate(t, [first - 0.3, first + 0.3], [0, 1], { ...clamp, easing: EASE_IN_OUT });
+  // На скрытых шагах (там графика исходника) трекер тоже уходит
+  const ai = cfg.steps.findIndex((s, i) => t >= s.start && t < stepEnd(cfg, i));
+  let vis = 1;
+  if (ai >= 0) {
+    const cur = cfg.steps[ai];
+    const prevHidden = ai > 0 && !!cfg.steps[ai - 1].hidden;
+    const from = prevHidden ? 0 : 1;
+    const to = cur.hidden ? 0 : 1;
+    vis = interpolate(t, [cur.start, cur.start + 0.3], [from, to], clamp);
+  }
   const leave = interpolate(t, [cfg.finalStart - 0.1, cfg.finalStart + 0.4], [1, 0], clamp);
 
   // Сколько шагов пройдено (дробное — для плавной заливки линий)
@@ -39,7 +49,7 @@ export const Tracker: React.FC<{ cfg: MeshVideoConfig }> = ({ cfg }) => {
   const gap = (G.width - size) / (N - 1);
 
   return (
-    <div style={{ position: "absolute", left: G.left, top: G.trackerTop, width: G.width, height: size, opacity: appear * leave }}>
+    <div style={{ position: "absolute", left: G.left, top: G.trackerTop, width: G.width, height: size, opacity: appear * leave * vis }}>
       {Array.from({ length: N - 1 }).map((_, i) => {
         const fill = Math.max(0, Math.min(1, progress - i));
         return (
