@@ -1,21 +1,22 @@
 import React from "react";
 import { Audio, Video } from "@remotion/media";
-import { AbsoluteFill, Sequence, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Img, Sequence, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import track from "./send-work-v2.track.json";
 import { MeshVideoConfig } from "../mesh/types";
 import { StepPanel, Tracker, stepEnd } from "../mesh/Panel";
 import { FONT, clamp } from "../mesh/theme";
 
 // Мобильный дневник · Ученик · «Как отправить работу на проверку» — версия под новую озвучку.
-// Картинка — исходный ролик, каждая фраза растянута/сжата под новую озвучку (±25%);
-// поверх — трекер и карточки шагов в стиле МЭШ, конфетти на «Готово!», тихие звуки.
+// Картинка — исходный ролик, где каждая фраза растянута/сжата под новую озвучку (±25%).
+// Перетаймированная копия собирается заранее ffmpeg (retimed.mp4, 30 к/с, кадр в кадр с композицией):
+//   начала фраз в исходнике OLD → в новой озвучке NEW, финал с логотипом (43.48–46.4) без изменений.
+//   OLD = [0, 4.73, 9.57, 12.02, 17.23, 19.4, 21.99, 24.25, 29.34, 32.44, 35.49, 38.24, 39.46, 43.48]
+//   NEW = [0, 4.23, 8.65, 11.04, 16.31, 18.29, 20.55, 22.34, 27.32, 30.16, 33.29, 35.87, 36.83, 40.3]
+// Поверх — трекер и карточки шагов в стиле МЭШ, конфетти на «Готово!», тихие звуки.
 
 const DIR = "videos/send-work-v2";
-
-// Начала фраз: в исходном ролике и в новой озвучке (transcript.json), одна фраза — один сегмент
-const OLD = [0, 4.73, 9.57, 12.02, 17.23, 19.4, 21.99, 24.25, 29.34, 32.44, 35.49, 38.24, 39.46, 43.48];
-const NEW = [0, 4.23, 8.65, 11.04, 16.31, 18.29, 20.55, 22.34, 27.32, 30.16, 33.29, 35.87, 36.83, 40.3];
-const FINAL_OLD = [43.48, 46.4]; // финал с логотипом — без изменений
-export const SEND_WORK_V2_DURATION = NEW[NEW.length - 1] + (FINAL_OLD[1] - FINAL_OLD[0]);
+const FRAMES = 1296; // длина retimed.mp4
+export const SEND_WORK_V2_DURATION = FRAMES / 30;
 
 const cfg: MeshVideoConfig = {
   id: "send-work-v2",
@@ -68,9 +69,8 @@ const cfg: MeshVideoConfig = {
   ],
 };
 
-// Тихие эффекты: «поп» на карточках, щелчки на нажатиях, мягкий удар на «Готово!»
+// Тихие эффекты: щелчки на нажатиях, «щёлк» камеры, мягкий удар на «Готово!» (без звуков на смене шагов и логотипе)
 const SFX: { at: number; s: string; gain: number }[] = [
-  ...[4.23, 8.65, 16.31, 18.29, 30.16, 33.29].map((at) => ({ at: at + 0.05, s: "pop", gain: 0.12 })),
   { at: 9.68, s: "click", gain: 0.18 },
   { at: 17.33, s: "click", gain: 0.18 },
   { at: 19.34, s: "click", gain: 0.18 },
@@ -79,53 +79,50 @@ const SFX: { at: number; s: string; gain: number }[] = [
   { at: 34.5, s: "click", gain: 0.18 },
   { at: 36.2, s: "hit", gain: 0.12 },
   { at: 36.25, s: "pop", gain: 0.16 },
-  { at: 40.45, s: "whoosh", gain: 0.08 },
 ];
 
 /* ── Сдвиг телефона влево ──
-   Положение телефона в исходнике (центр по X), найдено по кадрам (низкая насыщенность цвета).
-   Двигаем кадр так, чтобы телефон стоял на PHONE_X, но только влево: где он и так слева — не трогаем. */
+   Центр телефона по X в каждом кадре retimed.mp4 (send-work-v2.track.json), найден по низкой насыщенности.
+   Кадр сдвигается так, чтобы телефон стоял на PHONE_X, но только влево: где он и так слева — не трогаем. */
 const PHONE_X = 700;
-const TRACK: [number, number][] = [
-  [4.3, 967.5], [19.8, 967.5], [19.9, 924.5], [20.0, 756.5], [20.1, 587.5], [20.2, 544.5],
-  [32.2, 544.5], [32.3, 587.5], [32.4, 756.5], [32.5, 924.5], [32.6, 967.5], [44.0, 967.5],
-];
+const CENTER = 967.5; // телефон по центру исходника
+const COVER_CUT_F = 129; // кадр, где обложка сменяется пустым фоном
+const PHONE_GONE_F = 1226; // телефон ушёл, дальше логотип
 
-// Время исходника, которое показывается в момент t новой версии
-const oldTime = (t: number) => {
-  const last = NEW[NEW.length - 1];
-  if (t >= last) return FINAL_OLD[0] + (t - last);
-  const i = Math.max(0, NEW.findIndex((n, k) => t >= n && t < NEW[k + 1]));
-  return OLD[i] + ((t - NEW[i]) * (OLD[i + 1] - OLD[i])) / (NEW[i + 1] - NEW[i]);
+const shiftAt = (f: number) => {
+  if (f < COVER_CUT_F) return 0; // обложка не двигается
+  if (f >= PHONE_GONE_F) return (PHONE_X - CENTER) * interpolate(f, [PHONE_GONE_F, PHONE_GONE_F + 12], [1, 0], clamp);
+  const c = (track as (number | null)[])[f] ?? CENTER; // пока телефон вырастает — он по центру
+  return Math.min(0, PHONE_X - c);
 };
 
-const shiftAt = (t: number) => {
-  const o = oldTime(t);
-  if (o < TRACK[0][0]) return 0; // обложка
-  const c = interpolate(o, TRACK.map((k) => k[0]), TRACK.map((k) => k[1]), clamp);
-  const s = Math.min(0, PHONE_X - c);
-  // телефон уходит перед логотипом — плавно возвращаем кадр на место
-  return s * interpolate(o, [44.0, 44.4], [1, 0], clamp);
-};
+// Кадр со сдвигом: освободившуюся полосу справа заполняет край этого же кадра (с запасом и мягким стыком)
+const SEAM = 16;
+const Shifted: React.FC<{ shift: number; children: React.ReactNode }> = ({ shift, children }) => (
+  <>
+    <AbsoluteFill style={{ translate: `${shift}px 0px` }}>{children}</AbsoluteFill>
+    {shift < -0.5 ? (
+      <div
+        style={{
+          position: "absolute",
+          right: 0,
+          top: 0,
+          width: -shift + SEAM,
+          height: 1080,
+          overflow: "hidden",
+          maskImage: `linear-gradient(to right, transparent 0px, black ${SEAM}px)`,
+        }}
+      >
+        <div style={{ position: "absolute", right: 0, top: 0, width: 6, height: 1080, overflow: "hidden", scale: `${(-shift + SEAM) / 6} 1`, transformOrigin: "right center" }}>
+          <div style={{ position: "absolute", left: -1880, top: 0, width: 1920, height: 1080 }}>{children}</div>
+        </div>
+      </div>
+    ) : null}
+  </>
+);
 
-// Видеодорожка: исходник по сегментам-фразам
-const Track: React.FC = () => {
-  const { fps } = useVideoConfig();
-  const sec = (s: number) => Math.round(s * fps);
-  const src = staticFile(`${DIR}/source.mp4`);
-  return (
-    <>
-      {NEW.slice(0, -1).map((ns, i) => (
-        <Sequence key={`seg${i}`} name={`фраза ${i + 1}`} from={sec(ns)} durationInFrames={sec(NEW[i + 1]) - sec(ns)} premountFor={fps}>
-          <Video src={src} muted trimBefore={sec(OLD[i])} playbackRate={(OLD[i + 1] - OLD[i]) / (NEW[i + 1] - ns)} style={{ width: 1920, height: 1080 }} />
-        </Sequence>
-      ))}
-      <Sequence name="финал" from={sec(NEW[NEW.length - 1])} premountFor={fps}>
-        <Video src={src} muted trimBefore={sec(FINAL_OLD[0])} style={{ width: 1920, height: 1080 }} />
-      </Sequence>
-    </>
-  );
-};
+// Видеодорожка: перетаймированный исходник, кадр в кадр
+const Track: React.FC = () => <Video src={staticFile(`${DIR}/retimed.mp4`)} muted style={{ width: 1920, height: 1080 }} />;
 
 const Confetti: React.FC<{ at: number }> = ({ at }) => {
   const frame = useCurrentFrame();
@@ -166,22 +163,20 @@ export const SendWorkV2: React.FC = () => {
   const { fps } = useVideoConfig();
   const frame = useCurrentFrame();
   const sec = (s: number) => Math.round(s * fps);
-  const shift = shiftAt(frame / fps);
+  const shift = shiftAt(frame);
 
   return (
     <AbsoluteFill style={{ fontFamily: FONT, fontVariantNumeric: "lining-nums", fontFeatureSettings: '"lnum" 1' }}>
+      {/* Под обложкой — пустой фон исходника (уже сдвинутый): обложка в него растворяется */}
+      <Shifted shift={PHONE_X - CENTER}>
+        <Img src={staticFile(`${DIR}/bg.png`)} style={{ width: 1920, height: 1080 }} />
+      </Shifted>
       {/* Исходный ролик, сдвинутый так, чтобы телефон стоял левее */}
-      <AbsoluteFill style={{ translate: `${shift}px 0px` }}>
-        <Track />
+      <AbsoluteFill style={{ opacity: frame < COVER_CUT_F ? interpolate(frame, [COVER_CUT_F - 12, COVER_CUT_F - 1], [1, 0], clamp) : 1 }}>
+        <Shifted shift={shift}>
+          <Track />
+        </Shifted>
       </AbsoluteFill>
-      {/* Освободившаяся полоса справа: крайние 6 px кадра, растянутые на ширину сдвига */}
-      {shift < -0.5 ? (
-        <div style={{ position: "absolute", right: 0, top: 0, width: 6, height: 1080, overflow: "hidden", scale: `${-shift / 6} 1`, transformOrigin: "right center" }}>
-          <div style={{ position: "absolute", left: -1914, top: 0, width: 1920, height: 1080 }}>
-            <Track />
-          </div>
-        </div>
-      ) : null}
 
       {/* Моушен поверх: трекер и карточки шагов */}
       <Tracker cfg={cfg} />
