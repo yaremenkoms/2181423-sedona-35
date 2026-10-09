@@ -2,21 +2,35 @@ import { Composition, Folder } from "remotion";
 import { HelloWorld } from "./HelloWorld";
 import { Logo } from "./HelloWorld/Logo";
 import { Title } from "./HelloWorld/Title";
-import { ScanWorks } from "./ScanWorks/ScanWorks";
+import { MeshVideo } from "./mesh/MeshVideo";
+import { scanWorks } from "./videos/scan-works";
+import { laptopTest } from "./videos/laptop-test";
 
 // Each <Composition> is an entry in the sidebar!
 
 export const RemotionRoot: React.FC = () => {
   return (
     <>
-      <Composition
-        id="ScanWorks"
-        component={ScanWorks}
-        durationInFrames={1859}
-        fps={30}
-        width={1920}
-        height={1080}
-      />
+      <Folder name="MESH">
+        <Composition
+          id="scan-works"
+          component={MeshVideo}
+          durationInFrames={Math.ceil(scanWorks.durationSec * 30)}
+          fps={30}
+          width={1920}
+          height={1080}
+          defaultProps={{ cfg: scanWorks }}
+        />
+        <Composition
+          id="laptop-test"
+          component={MeshVideo}
+          durationInFrames={Math.ceil(laptopTest.durationSec * 30)}
+          fps={30}
+          width={1920}
+          height={1080}
+          defaultProps={{ cfg: laptopTest }}
+        />
+      </Folder>
       <Folder name="Elements">
         <Composition
           id="Logo"

@@ -10,3 +10,9 @@ out
 public/source.mp4
 public/voice.m4a
 public/screen_start.png
+
+# Материалы роликов (озвучка, обложки, скриншоты) — присылает заказчик, в git не храним
+public/videos/**/*.mp3
+public/videos/**/*.png
+public/videos/**/*.jpg
+public/videos/**/*.webp
