@@ -29,7 +29,7 @@ const cfg: MeshVideoConfig = {
   coverEnd: 4.23,
   finalStart: 40.3,
   scenes: [],
-  panel: { left: 1270, width: 600, trackerTop: 140, contentTop: 250 },
+  panel: { left: 1040, width: 740, trackerTop: 140, contentTop: 250 },
   steps: [
     {
       start: 4.23,
@@ -82,6 +82,51 @@ const SFX: { at: number; s: string; gain: number }[] = [
   { at: 40.45, s: "whoosh", gain: 0.08 },
 ];
 
+/* ── Сдвиг телефона влево ──
+   Положение телефона в исходнике (центр по X), найдено по кадрам (низкая насыщенность цвета).
+   Двигаем кадр так, чтобы телефон стоял на PHONE_X, но только влево: где он и так слева — не трогаем. */
+const PHONE_X = 700;
+const TRACK: [number, number][] = [
+  [4.3, 967.5], [19.8, 967.5], [19.9, 924.5], [20.0, 756.5], [20.1, 587.5], [20.2, 544.5],
+  [32.2, 544.5], [32.3, 587.5], [32.4, 756.5], [32.5, 924.5], [32.6, 967.5], [44.0, 967.5],
+];
+
+// Время исходника, которое показывается в момент t новой версии
+const oldTime = (t: number) => {
+  const last = NEW[NEW.length - 1];
+  if (t >= last) return FINAL_OLD[0] + (t - last);
+  const i = Math.max(0, NEW.findIndex((n, k) => t >= n && t < NEW[k + 1]));
+  return OLD[i] + ((t - NEW[i]) * (OLD[i + 1] - OLD[i])) / (NEW[i + 1] - NEW[i]);
+};
+
+const shiftAt = (t: number) => {
+  const o = oldTime(t);
+  if (o < TRACK[0][0]) return 0; // обложка
+  const c = interpolate(o, TRACK.map((k) => k[0]), TRACK.map((k) => k[1]), clamp);
+  const s = Math.min(0, PHONE_X - c);
+  // телефон уходит перед логотипом — плавно возвращаем кадр на место
+  return s * interpolate(o, [44.0, 44.4], [1, 0], clamp);
+};
+
+// Видеодорожка: исходник по сегментам-фразам
+const Track: React.FC = () => {
+  const { fps } = useVideoConfig();
+  const sec = (s: number) => Math.round(s * fps);
+  const src = staticFile(`${DIR}/source.mp4`);
+  return (
+    <>
+      {NEW.slice(0, -1).map((ns, i) => (
+        <Sequence key={`seg${i}`} name={`фраза ${i + 1}`} from={sec(ns)} durationInFrames={sec(NEW[i + 1]) - sec(ns)} premountFor={fps}>
+          <Video src={src} muted trimBefore={sec(OLD[i])} playbackRate={(OLD[i + 1] - OLD[i]) / (NEW[i + 1] - ns)} style={{ width: 1920, height: 1080 }} />
+        </Sequence>
+      ))}
+      <Sequence name="финал" from={sec(NEW[NEW.length - 1])} premountFor={fps}>
+        <Video src={src} muted trimBefore={sec(FINAL_OLD[0])} style={{ width: 1920, height: 1080 }} />
+      </Sequence>
+    </>
+  );
+};
+
 const Confetti: React.FC<{ at: number }> = ({ at }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -119,24 +164,24 @@ const Confetti: React.FC<{ at: number }> = ({ at }) => {
 
 export const SendWorkV2: React.FC = () => {
   const { fps } = useVideoConfig();
+  const frame = useCurrentFrame();
   const sec = (s: number) => Math.round(s * fps);
-  const src = staticFile(`${DIR}/source.mp4`);
+  const shift = shiftAt(frame / fps);
 
   return (
     <AbsoluteFill style={{ fontFamily: FONT, fontVariantNumeric: "lining-nums", fontFeatureSettings: '"lnum" 1' }}>
-      {/* Исходный ролик по сегментам-фразам, скорость = старая длина / новая */}
-      {NEW.slice(0, -1).map((ns, i) => {
-        const nl = NEW[i + 1] - ns;
-        const ol = OLD[i + 1] - OLD[i];
-        return (
-          <Sequence key={`seg${i}`} name={`фраза ${i + 1}`} from={sec(ns)} durationInFrames={sec(NEW[i + 1]) - sec(ns)} premountFor={fps}>
-            <Video src={src} muted trimBefore={sec(OLD[i])} playbackRate={ol / nl} style={{ width: "100%", height: "100%" }} />
-          </Sequence>
-        );
-      })}
-      <Sequence name="финал" from={sec(NEW[NEW.length - 1])} premountFor={fps}>
-        <Video src={src} muted trimBefore={sec(FINAL_OLD[0])} style={{ width: "100%", height: "100%" }} />
-      </Sequence>
+      {/* Исходный ролик, сдвинутый так, чтобы телефон стоял левее */}
+      <AbsoluteFill style={{ translate: `${shift}px 0px` }}>
+        <Track />
+      </AbsoluteFill>
+      {/* Освободившаяся полоса справа: крайние 6 px кадра, растянутые на ширину сдвига */}
+      {shift < -0.5 ? (
+        <div style={{ position: "absolute", right: 0, top: 0, width: 6, height: 1080, overflow: "hidden", scale: `${-shift / 6} 1`, transformOrigin: "right center" }}>
+          <div style={{ position: "absolute", left: -1914, top: 0, width: 1920, height: 1080 }}>
+            <Track />
+          </div>
+        </div>
+      ) : null}
 
       {/* Моушен поверх: трекер и карточки шагов */}
       <Tracker cfg={cfg} />
