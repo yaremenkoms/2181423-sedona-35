@@ -5,12 +5,24 @@ import { Title } from "./HelloWorld/Title";
 import { MeshVideo } from "./mesh/MeshVideo";
 import { scanWorks } from "./videos/scan-works";
 import { laptopTest } from "./videos/laptop-test";
+import { motionDuration } from "./motion/Stage";
+import { SendHomework, sendHomework } from "./motion/videos/send-homework";
 
 // Each <Composition> is an entry in the sidebar!
 
 export const RemotionRoot: React.FC = () => {
   return (
     <>
+      <Folder name="MOTION">
+        <Composition
+          id="motion-send-homework"
+          component={SendHomework}
+          durationInFrames={Math.ceil(motionDuration(sendHomework) * 30)}
+          fps={30}
+          width={sendHomework.width}
+          height={sendHomework.height}
+        />
+      </Folder>
       <Folder name="MESH">
         <Composition
           id="scan-works"
