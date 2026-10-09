@@ -5,3 +5,8 @@ dist
 
 # Ignore the output video from Git but not videos you import into src/.
 out
+
+# Исходный ролик и производные от него файлы (не публикуем в git)
+public/source.mp4
+public/voice.m4a
+public/screen_start.png

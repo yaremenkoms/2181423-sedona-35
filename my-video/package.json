@@ -7,6 +7,8 @@
   "private": true,
   "dependencies": {
     "@remotion/cli": "4.0.534",
+    "@remotion/fonts": "4.0.534",
+    "@remotion/media": "4.0.534",
     "@remotion/zod-types": "4.0.534",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -14,6 +16,7 @@
     "zod": "4.5.4"
   },
   "devDependencies": {
+    "@fontsource/manrope": "^5.3.0",
     "@remotion/eslint-config-flat": "4.0.534",
     "@types/react": "19.2.7",
     "@types/web": "0.0.166",
